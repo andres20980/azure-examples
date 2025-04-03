@@ -1,0 +1,117 @@
+# |-----------------------------------------------------------------------------|
+# |                           VELERO CONFIGURATION                              |
+# |-----------------------------------------------------------------------------| 
+
+# Container defitions for initializing the service and plugins
+initContainers:
+    - name: velero-plugin-for-azure
+      image: velero/velero-plugin-for-microsoft-azure:v1.5.0
+      imagePullPolicy: IfNotPresent
+      volumeMounts:
+        - mountPath: /target
+          name: plugins
+volumes:
+  - name: plugins
+    emptyDir: {}
+
+# Dont overwrite existing CDR -> can cause errors
+cleanUpCRDs: false
+
+# |-------------------------------------------------|
+# |             PROMETHEUS METRICS                  |
+# |-------------------------------------------------| 
+# If want to disable this, dont delete, its enabled by default
+
+metrics:
+  enabled: true
+  scrapeInterval: 30s
+  scrapeTimeout: 10s
+
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8085"
+    prometheus.io/path: "/metrics"
+
+  serviceMonitor:
+    autodetect: true
+    enabled: true
+
+  nodeAgentPodMonitor:
+    autodetect: true
+    enabled: true
+
+  # |-------------------------------------------------------------|
+  # |              SNAPSHOTS AND BACKUP LOCATIONS                 |
+  # |-------------------------------------------------------------|
+ 
+configuration:
+  backupStorageLocation:
+  - name:  default
+    provider: "azure"
+    bucket: "velero-blob-container"            
+    accessMode: ReadWrite
+    config:
+      # Configured to store backups in a blob container inside an Storage Account
+      resourceGroup:  k8s-arch-rg # Setted by Terraform 
+      storageAccount: k8sarchstorageaccount # Setted by Terraform 
+
+
+  volumeSnapshotLocation:
+  - name: default
+    provider: azure    
+    config: 
+      # Configured to use a managed disk within the AKS resource group
+      resourceGroup: ""   # Setted by Terraform 
+      subscriptionId: ""  # Setted by Terraform 
+
+# |-------------------------------------------------|
+# |              RBAC CREDENTIALS                   |
+# |-------------------------------------------------| 
+
+# Create RBAC permissions for velero
+rbac:
+  create: true
+  clusterAdministrator: true
+  clusterAdministratorName: cluster-admin
+
+# Information about the Kubernetes service account Velero uses.
+serviceAccount:
+  server:
+    create: true
+    name: "velero-service-account"
+
+# # Create backupstoragelocation crd, if false => not create a backup location
+backupsEnabled: true
+
+# # Create volumesnapshotlocation crd, if false => disable snapshot backups in managed disk. 
+# # In case that volume snapshots are disabled, maybe Managed Disk in the infra is not needed
+snapshotsEnabled: true
+
+# # Deply daemoset --> needed for whole node backups
+deployNodeAgent: true
+
+
+  # |-----------------------------------------------------------------------------|
+  # |                         SCHEDULES SETTINGS                                  |
+  # |-----------------------------------------------------------------------------|
+  # Define shcedules to do the backups
+
+# Backup schedules to create.
+# # Format of the schedules
+# schedules:
+#   mybackup:
+#     disabled: false
+#     labels:
+#       myenv: foo
+#     annotations:
+#       myenv: foo
+#     schedule: "0 0 * * *"
+#     useOwnerReferencesInBackup: false
+#     paused: false
+#     template:
+#       ttl: "240h"
+#       storageLocation: default
+#       includedNamespaces:
+#       - foo
+schedules: {}
+

@@ -1,0 +1,6 @@
+.terraform/**
+*.swp
+.terraform*
+.obsidian/**
+.obsidian/
+.kubeconfig
